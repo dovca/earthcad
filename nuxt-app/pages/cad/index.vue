@@ -15,29 +15,29 @@
 		SphereGeometry, TextureLoader, Vector2, Vector3,
 		WebGLRenderer
 	} from 'three';
-	import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
 	import {useMouse} from '@vueuse/core';
 	import {lineSphereIntersection} from '~/src/intersections';
+	import MotionControls from '~/src/MotionControls';
+	import {screenToClip} from '~/src/projections';
+	import {HALFPI, mapRange} from '~/src/math';
 
 	const canvas = ref<HTMLCanvasElement | null>(null);
-
-	const mouse = useMouse({target: canvas});
 
 	onMounted(() => {
 		if (!canvas.value) return;
 
 		const scene = new Scene();
-		const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+		const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
 		const renderer = new WebGLRenderer({canvas: canvas.value});
 
-		camera.position.z = 5;
+		camera.position.z = 25000;
 
 		const clippingPlane = new Plane(new Vector3(0, 0, 1));
 
 		const testureLoader = new TextureLoader();
 		const earthTexture = testureLoader.load('/assets/cad/textures/2k_earth_daymap.jpg');
 
-		const sphereGeometry = new SphereGeometry(1, 32, 32);
+		const sphereGeometry = new SphereGeometry(10000, 64, 64);
 		const sphereMaterial = new MeshPhongMaterial({
 			specular: 0x555555,
 			shininess: 30,
@@ -51,20 +51,15 @@
 		const sunlight = new DirectionalLight(0xffffff, 1);
 		sunlight.position.set(1, 0.2, 0);
 
-		const orbitControls = new OrbitControls(camera, canvas.value);
+		const orbitControls = new MotionControls(camera, canvas.value);
+
+		console.log(orbitControls);
 
 		scene.add(earth);
 		scene.add(ambientLight);
 		scene.add(sunlight);
 
 		renderer.setSize(window.innerWidth, window.innerHeight);
-
-		const pointer = new Vector2();
-
-		watch([mouse.x, mouse.y], () => {
-			pointer.x = (mouse.x.value / window.innerWidth) * 2 - 1;
-			pointer.y = -(mouse.y.value / window.innerHeight) * 2 + 1;
-		});
 
 		renderer.localClippingEnabled = true;
 
@@ -81,10 +76,12 @@
 		canvas.value.addEventListener('mousedown', () => {
 			mouseDownTimestamp = Date.now();
 		});
-		canvas.value.addEventListener('click', () => {
+		canvas.value.addEventListener('click', (event) => {
 			if (mouseDownTimestamp + 200 < Date.now()) return;
 
 			const raycaster = new Raycaster();
+			const {x, y} = screenToClip(event.clientX, event.clientY);
+			const pointer = new Vector2(x, y);
 			raycaster.setFromCamera(pointer, camera);
 
 			const [intersection] = lineSphereIntersection(
@@ -105,11 +102,12 @@
 
 		function render() {
 			orbitControls.update();
-
 			const cameraDirection = new Vector3(0);
 			camera.getWorldDirection(cameraDirection);
-			clippingPlane.normal.copy(cameraDirection).negate();
-			clippingPlane.constant = -1 + Math.atan(camera.position.length() - 1) / Math.PI * 2;
+			clippingPlane.normal.copy(cameraDirection).negate().normalize();
+			const r = earth.geometry.parameters.radius;
+
+			clippingPlane.constant = r * (Math.atan(camera.position.length() / r - 1) / HALFPI - 1);
 
 			renderer.render(scene, camera);
 			requestAnimationFrame(render);
