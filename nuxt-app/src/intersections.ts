@@ -1,13 +1,12 @@
 import {Vector3} from 'three';
 
+// http://www.codeproject.com/Articles/19799/Simple-Ray-Tracing-in-C-Part-II-Triangles-Intersec
 export function lineSphereIntersection(
 	linePoint0: Vector3,
 	linePoint1: Vector3,
 	circleCenter: Vector3,
 	circleRadius: number,
 ): Vector3[] {
-	// http://www.codeproject.com/Articles/19799/Simple-Ray-Tracing-in-C-Part-II-Triangles-Intersec
-
 	const {x: cx, y: cy, z: cz} = circleCenter;
 	const {x: px, y: py, z: pz} = linePoint0;
 
